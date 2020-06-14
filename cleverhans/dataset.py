@@ -97,11 +97,7 @@ class MNIST(Dataset):
                                                   test_start=test_start,
                                                   test_end=test_end)
 
-    if center:
-      x_train = x_train * 2. - 1.
-      x_test = x_test * 2. - 1.
-    x_train *= max_val
-    x_test *= max_val
+
 
     self.x_train = x_train.astype('float32')
     self.y_train = y_train.astype('float32')
@@ -112,6 +108,32 @@ class MNIST(Dataset):
     return (self.in_memory_dataset(self.x_train, self.y_train, shuffle),
             self.in_memory_dataset(self.x_test, self.y_test, repeat=False))
 
+class FASHION_MNIST(Dataset):
+  """The FASHION_MNIST dataset"""
+
+  NB_CLASSES = 10
+
+  def __init__(self, train_start=0, train_end=60000, test_start=0,
+               test_end=10000, center=False, max_val=1.):
+    kwargs = locals()
+    if '__class__' in kwargs:
+      del kwargs['__class__']
+    super(FASHION_MNIST, self).__init__(kwargs)
+    x_train, y_train, x_test, y_test = data_fashion_mnist_2(train_start=train_start,
+                                                  train_end=train_end,
+                                                  test_start=test_start,
+                                                  test_end=test_end)
+
+
+
+    self.x_train = x_train.astype('float32')
+    self.y_train = y_train.astype('float32')
+    self.x_test = x_test.astype('float32')
+    self.y_test = y_test.astype('float32')
+
+  def to_tensorflow(self, shuffle=4096):
+    return (self.in_memory_dataset(self.x_train, self.y_train, shuffle),
+            self.in_memory_dataset(self.x_test, self.y_test, repeat=False))
 
 class CIFAR10(Dataset):
   """The CIFAR-10 dataset"""
@@ -183,11 +205,7 @@ def maybe_download_file(url, datadir=None, force=False):
     urlretrieve(url, dest_file)
   return dest_file
 
-
-def download_and_parse_mnist_file(file_name, datadir=None, force=False):
-  url = os.path.join('http://yann.lecun.com/exdb/mnist/', file_name)
-  file_name = maybe_download_file(url, datadir=datadir, force=force)
-
+def parse_mnist_file(file_name):
   # Open the file and unzip it if necessary
   if os.path.splitext(file_name)[1] == '.gz':
     open_fn = gzip.open
@@ -203,12 +221,12 @@ def download_and_parse_mnist_file(file_name, datadir=None, force=False):
     assert zeros == 0
 
     hex_to_data_type = {
-        0x08: 'B',
-        0x09: 'b',
-        0x0b: 'h',
-        0x0c: 'i',
-        0x0d: 'f',
-        0x0e: 'd'}
+      0x08: 'B',
+      0x09: 'b',
+      0x0b: 'h',
+      0x0c: 'i',
+      0x0d: 'f',
+      0x0e: 'd'}
     data_type = hex_to_data_type[data_type]
 
     # data_type unicode to ascii conversion (Python2 fix)
@@ -216,8 +234,8 @@ def download_and_parse_mnist_file(file_name, datadir=None, force=False):
       data_type = data_type.encode('ascii', 'ignore')
 
     dim_sizes = struct.unpack(
-        '>' + 'I' * n_dims,
-        file_descriptor.read(4 * n_dims))
+      '>' + 'I' * n_dims,
+      file_descriptor.read(4 * n_dims))
 
     data = array.array(data_type, file_descriptor.read())
     data.byteswap()
@@ -226,6 +244,16 @@ def download_and_parse_mnist_file(file_name, datadir=None, force=False):
     assert len(data) == desired_items
     return np.array(data).reshape(dim_sizes)
 
+def download_and_parse_fashion_mnist_file(file_name, datadir=None, force=False):
+  url = os.path.join('http://fashion-mnist.s3-website.eu-central-1.amazonaws.com/', file_name)
+  #url = os.path.join('https://github.com/zalandoresearch/fashion-mnist/tree/master/data/fashion/', file_name)
+  file_name = maybe_download_file(url, datadir=datadir, force=force)
+  return parse_mnist_file(file_name)
+
+def download_and_parse_mnist_file(file_name, datadir=None, force=False):
+  url = os.path.join('http://yann.lecun.com/exdb/mnist/', file_name)
+  file_name = maybe_download_file(url, datadir=datadir, force=force)
+  return parse_mnist_file(file_name)
 
 def data_mnist(datadir=tempfile.gettempdir(), train_start=0,
                train_end=60000, test_start=0, test_end=10000):
@@ -265,6 +293,76 @@ def data_mnist(datadir=tempfile.gettempdir(), train_start=0,
   Y_test = utils.to_categorical(Y_test, nb_classes=10)
   return X_train, Y_train, X_test, Y_test
 
+def data_fashion_mnist(datadir=tempfile.gettempdir(), train_start=0,
+               train_end=60000, test_start=0, test_end=10000):
+  """
+  Load and preprocess MNIST dataset
+  :param datadir: path to folder where data should be stored
+  :param train_start: index of first training set example
+  :param train_end: index of last training set example
+  :param test_start: index of first test set example
+  :param test_end: index of last test set example
+  :return: tuple of four arrays containing training data, training labels,
+           testing data and testing labels.
+  """
+  assert isinstance(train_start, int)
+  assert isinstance(train_end, int)
+  assert isinstance(test_start, int)
+  assert isinstance(test_end, int)
+
+  X_train = download_and_parse_fashion_mnist_file(
+      'train-images-idx3-ubyte.gz', datadir=datadir) / 255.
+  Y_train = download_and_parse_fashion_mnist_file(
+      'train-labels-idx1-ubyte.gz', datadir=datadir)
+  X_test = download_and_parse_fashion_mnist_file(
+      't10k-images-idx3-ubyte.gz', datadir=datadir) / 255.
+  Y_test = download_and_parse_fashion_mnist_file(
+      't10k-labels-idx1-ubyte.gz', datadir=datadir)
+
+  X_train = np.expand_dims(X_train, -1)
+  X_test = np.expand_dims(X_test, -1)
+
+  X_train = X_train[train_start:train_end]
+  Y_train = Y_train[train_start:train_end]
+  X_test = X_test[test_start:test_end]
+  Y_test = Y_test[test_start:test_end]
+
+  Y_train = utils.to_categorical(Y_train, nb_classes=10)
+  Y_test = utils.to_categorical(Y_test, nb_classes=10)
+  return X_train, Y_train, X_test, Y_test
+
+
+def data_fashion_mnist_2(train_start=0, train_end=60000, test_start=0, test_end=10000):
+  img_rows = 28
+  img_cols = 28
+  nb_classes = 10
+  fashion_mnist = tf.keras.datasets.fashion_mnist
+  (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
+
+  if tf.keras.backend.image_data_format() == 'channels_first':
+    x_train = x_train.reshape(x_train.shape[0], 3, img_rows, img_cols)
+    x_test = x_test.reshape(x_test.shape[0], 3, img_rows, img_cols)
+  else:
+    x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
+    x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
+  x_train = x_train.astype('float32')
+  x_test = x_test.astype('float32')
+  x_train /= 255
+  x_test /= 255
+  print('x_train shape:', x_train.shape)
+  print(x_train.shape[0], 'train samples')
+  print(x_test.shape[0], 'test samples')
+
+  # convert class vectors to binary class matrices
+  y_train = np_utils.to_categorical(y_train, nb_classes)
+  y_test = np_utils.to_categorical(y_test, nb_classes)
+
+  x_train = x_train[train_start:train_end, :, :, :]
+  y_train = y_train[train_start:train_end, :]
+  x_test = x_test[test_start:test_end, :]
+  y_test = y_test[test_start:test_end, :]
+
+  return x_train, y_train, x_test, y_test
 
 def data_cifar10(train_start=0, train_end=50000, test_start=0, test_end=10000):
   """
@@ -305,3 +403,5 @@ def data_cifar10(train_start=0, train_end=50000, test_start=0, test_end=10000):
   y_test = y_test[test_start:test_end, :]
 
   return x_train, y_train, x_test, y_test
+
+
