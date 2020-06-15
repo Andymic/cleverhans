@@ -94,6 +94,31 @@ def cnn_model(logits=False, input_ph=None, img_rows=28, img_cols=28,
     return model
 
 
+def cnn_model_fashion_mnist(logits=False, input_ph=None, img_rows=28, img_cols=28,
+              channels=1, nb_filters=16, nb_classes=10):
+  model = Sequential()
+
+  # Define the layers successively (convolution layers are version dependent)
+  if tf.keras.backend.image_data_format() == 'channels_first':
+    input_shape = (channels, img_rows, img_cols)
+  else:
+    assert tf.keras.backend.image_data_format() == 'channels_last'
+    input_shape = (img_rows, img_cols, channels)
+
+  model = tf.keras.models.Sequential([
+    tf.keras.layers.Conv2D(nb_filters, (3, 3), activation='relu', input_shape=input_shape),
+    tf.keras.layers.MaxPooling2D(2, 2),
+    tf.keras.layers.Conv2D(nb_filters, (3, 3), activation='relu'),
+    tf.keras.layers.MaxPooling2D(2, 2),
+    # tf.keras.layers.Conv2D(nb_filters * 4, (3, 3), activation='relu'),
+    # tf.keras.layers.MaxPooling2D(2, 2),
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(nb_classes, activation='softmax')
+  ])
+
+  return model
+
 class KerasModelWrapper(Model):
   """
   An implementation of `Model` that wraps a Keras model. It
