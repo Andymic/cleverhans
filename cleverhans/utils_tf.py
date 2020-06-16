@@ -18,7 +18,7 @@ import tensorflow as tf
 from cleverhans.compat import device_lib
 from cleverhans.compat import reduce_sum, reduce_mean
 from cleverhans.compat import reduce_max
-from cleverhans.compat import softmax_cross_entropy_with_logits
+from cleverhans.compat import softmax_cross_entropy_with_logits, sparse_softmax_cross_entropy_with_logits
 from cleverhans.utils import batch_indices, _ArgsWrapper, create_logger
 
 _logger = create_logger("cleverhans.utils.tf")
@@ -43,7 +43,7 @@ def model_loss(y, model, mean=True):
   else:
     logits = model
 
-  out = softmax_cross_entropy_with_logits(logits=logits, labels=y)
+  out = sparse_softmax_cross_entropy_with_logits(logits=logits, labels=y)
 
   if mean:
     out = reduce_mean(out)
